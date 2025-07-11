@@ -146,16 +146,16 @@ namespace StudentManagementDataAccess.Implementation
                         {
                             // 获取删除行的原始ID，注意 DataRowVersion.Original
                             var idsToDelete = deletedRows.Select(r => r["sid", DataRowVersion.Original]).ToList();
-                            totalRowsAffected += await connection.ExecuteAsync("DELETE FROM Students WHERE Sid IN @Ids", new { Ids = idsToDelete }, transaction);
+                            totalRowsAffected += await connection.ExecuteAsync("DELETE FROM Student WHERE Sid IN @Ids", new { Ids = idsToDelete }, transaction);
                         }
-                        MessageBox.Show("删除成功");
+
 
                         // --- 处理修改的行 ---
                         var modifiedRows = changes.AsEnumerable().Where(r => r.RowState == DataRowState.Modified).ToList();
                         if (modifiedRows.Any())
                         {
                             totalRowsAffected += await connection.ExecuteAsync(
-                                "UPDATE Students SET Sname = @Sname, Sage = @Sage, Ssex = @Ssex WHERE Sid = @Sid",
+                                "UPDATE Student SET Sname = @Sname, Sage = @Sage, Ssex = @Ssex WHERE Sid = @Sid",
                                 modifiedRows.Select(r => new Student // 假设Student是您的实体类
                                 {
                                     Sid = r.Field<int>("sid"),
@@ -166,7 +166,7 @@ namespace StudentManagementDataAccess.Implementation
                                 transaction
                             );
                         }
-                        MessageBox.Show("修改成功");
+
                         // --- 处理新增的行 ---
                         var addedRows = changes.AsEnumerable().Where(r => r.RowState == DataRowState.Added).ToList();
                         if (addedRows.Any())
@@ -174,7 +174,7 @@ namespace StudentManagementDataAccess.Implementation
                             // 注意：如果Sid是自增主键，INSERT语句中不应包含Sid
                             // 这里假设Sid不是自增的，如果Sid是自增的，请从INSERT和匿名对象中移除Sid
                             totalRowsAffected += await connection.ExecuteAsync(
-                                "INSERT INTO Students (Sid, Sname, Sage, Ssex) VALUES (@Sid, @Sname, @Sage, @Ssex)",
+                                "INSERT INTO Student (Sid, Sname, Sage, Ssex) VALUES (@Sid, @Sname, @Sage, @Ssex)",
                                 addedRows.Select(r => new Student
                                 {
                                     Sid = r.Field<int>("sid"),
@@ -185,7 +185,6 @@ namespace StudentManagementDataAccess.Implementation
                                 transaction
                             );
                         }
-                        MessageBox.Show("新增成功");
 
                         // 3. 在所有操作都成功完成后，在 try 块的末尾提交事务
                         transaction.Commit();
