@@ -1,4 +1,5 @@
 ﻿using Dapper; // 引入Dapper命名空间
+using Microsoft.IdentityModel.Tokens;
 using StudentManagement.Core.Models;
 using StudentManagementData.Abstractions;
 using System;
@@ -56,9 +57,81 @@ namespace StudentManagementDataAccess.Implementation
             }
         }
 
-        public Task<DataTable> DynamicQuery(Student student)
+        public async Task<DataTable> DynamicQuery(Student student, DateTime start_date, DateTime end_date)
         {
-            throw new NotImplementedException();
+            var sqlBuilder = new StringBuilder("SELECT sid, sname, sage, ssex FROM Student");
+            var conditions = new List<string>();
+            var parameters = new DynamicParameters();
+            
+            // 如果提供了具体的学生ID，则只按ID查询，忽略其他条件
+            if (student.Sid > 0)
+            {
+                conditions.Add("sid = @Sid");
+                parameters.Add("Sid", student.Sid);
+            }
+            else
+            {
+                // 按姓名模糊查询
+                if (!string.IsNullOrEmpty(student.Sname))
+                {
+                    conditions.Add("sname LIKE @Sname");
+                    parameters.Add("Sname", $"%{student.Sname}%");
+                }
+                
+                // 日期范围查询 - 使用默认值来判断是否设置了有效日期
+                // DateTimePicker的默认最小值通常是1753/1/1，可以用来判断是否被设置
+                DateTime minValidDate = new DateTime(1900, 1, 1); // 设定一个合理的最小有效日期
+                
+                bool hasStartDate = start_date > minValidDate;
+                bool hasEndDate = end_date > minValidDate;
+                
+                if (hasStartDate && hasEndDate)
+                {
+                    // 有开始和结束日期
+                    if (start_date.Date <= end_date.Date)
+                    {
+                        conditions.Add("sage BETWEEN @StartDate AND @EndDate");
+                        parameters.Add("StartDate", start_date.Date);
+                        parameters.Add("EndDate", end_date.Date.AddDays(1).AddSeconds(-1)); // 包含整天
+                    }
+                    else
+                    {
+                        throw new ArgumentException("开始日期不能大于结束日期");
+                    }
+                }
+
+                // 按性别查询
+                if (!string.IsNullOrEmpty(student.Ssex))
+                {
+                    conditions.Add("ssex = @Ssex");
+                    parameters.Add("Ssex", student.Ssex);
+                }
+            }
+
+            if (conditions.Any())
+            {
+                sqlBuilder.Append(" WHERE ");
+                sqlBuilder.Append(string.Join(" AND ", conditions));
+            }
+            
+            using(IDbConnection connection = _connectionFactory.GetConnection())
+            {
+                try
+                {
+                    var dataTable = new DataTable();
+                    using (var reader = await connection.ExecuteReaderAsync(sqlBuilder.ToString(), parameters))
+                    {
+                        dataTable.Load(reader);
+                    }
+                    return dataTable;
+                }
+                catch (Exception ex)
+                {
+                    // 处理异常，例如记录日志
+                    throw new Exception("动态查询学生信息时发生错误", ex);
+                }
+            }
+
         }
 
         public async Task<DataTable> GetAllAsync()
@@ -146,6 +219,10 @@ namespace StudentManagementDataAccess.Implementation
                         {
                             // 获取删除行的原始ID，注意 DataRowVersion.Original
                             var idsToDelete = deletedRows.Select(r => r["sid", DataRowVersion.Original]).ToList();
+
+                            //先同步删除到分数表
+                            string deleteScoresSql = "DELETE FROM SC WHERE Sid IN @Ids";
+                            var res= await connection.ExecuteAsync(deleteScoresSql, new { Ids = idsToDelete }, transaction);
                             totalRowsAffected += await connection.ExecuteAsync("DELETE FROM Student WHERE Sid IN @Ids", new { Ids = idsToDelete }, transaction);
                         }
 
@@ -156,7 +233,7 @@ namespace StudentManagementDataAccess.Implementation
                         {
                             totalRowsAffected += await connection.ExecuteAsync(
                                 "UPDATE Student SET Sname = @Sname, Sage = @Sage, Ssex = @Ssex WHERE Sid = @Sid",
-                                modifiedRows.Select(r => new Student // 假设Student是您的实体类
+                                modifiedRows.Select(r => new Student 
                                 {
                                     Sid = r.Field<int>("sid"),
                                     Sname = r.Field<string>("sname"),
@@ -171,8 +248,7 @@ namespace StudentManagementDataAccess.Implementation
                         var addedRows = changes.AsEnumerable().Where(r => r.RowState == DataRowState.Added).ToList();
                         if (addedRows.Any())
                         {
-                            // 注意：如果Sid是自增主键，INSERT语句中不应包含Sid
-                            // 这里假设Sid不是自增的，如果Sid是自增的，请从INSERT和匿名对象中移除Sid
+
                             totalRowsAffected += await connection.ExecuteAsync(
                                 "INSERT INTO Student (Sid, Sname, Sage, Ssex) VALUES (@Sid, @Sname, @Sage, @Ssex)",
                                 addedRows.Select(r => new Student
@@ -204,7 +280,6 @@ namespace StudentManagementDataAccess.Implementation
                         studentstable.RejectChanges();
 
                         // 记录日志并向上抛出异常，让调用方知道操作失败
-                        // (可选) log.Error("保存学生信息失败", ex);
                         throw new Exception("保存更改时发生错误，操作已回滚。", ex);
                     }
                 } // using 会自动关闭事务

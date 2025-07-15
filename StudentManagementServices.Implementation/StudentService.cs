@@ -28,6 +28,11 @@ namespace StudentManagementServices.Implementation
             return await _studentRepository.DeleteAsync(students);
         }
 
+        public async Task<DataTable> DynamicQueryAsync(Student student, DateTime start_date, DateTime end_date)
+        {
+            return await _studentRepository.DynamicQuery(student, start_date, end_date);
+        }
+
         public async Task<DataTable> GetAllStudentsAsync()
         {
             // 调用仓库方法获取所有学生信息

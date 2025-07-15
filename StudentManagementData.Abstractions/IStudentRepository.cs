@@ -11,7 +11,7 @@ namespace StudentManagementData.Abstractions
     public interface IStudentRepository
     {
         Task<DataTable> GetAllAsync(); // 返回全部学生信息
-        Task<DataTable> DynamicQuery(Student student);
+        Task<DataTable> DynamicQuery(Student student, DateTime start_date, DateTime end_date);
         Task<bool> InsertAsync(Student student); // 插入新学生
         Task<bool> InsertAsync(List<Student> students);
         Task<bool> DeleteAsync(int id);

@@ -44,8 +44,12 @@ namespace StudentManagement
             Services.AddSingleton(Configuration);
             Services.AddSingleton<IDbConnectionFactory, DbConnectionFactory>();
             Services.AddTransient<IStudentRepository, StudentRepository>();
+            Services.AddTransient<IScoreRepository, ScoreRepository>();
+            Services.AddTransient<IScoreService, ScoreService>();
             Services.AddTransient<IStudentService, StudentService>();
-
+            //注册课程
+            Services.AddTransient<ICourseRepository, CourseRepository>();
+            Services.AddTransient<ICourseService, CourseService>();
             Services.AddTransient<Form1>();
             ServiceProvider serviceProvider = Services.BuildServiceProvider();
             var mainForm = serviceProvider.GetService<Form1>();

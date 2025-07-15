@@ -14,6 +14,7 @@ namespace StudentManagementServices.Abstractions
         Task<bool> UpdateStudentAsync(List<Student> students);
 
         Task<DataTable> GetAllStudentsAsync();
+        Task<DataTable> DynamicQueryAsync(Student student, DateTime start_date, DateTime end_date);
 
         Task<bool> DeleteStudentAsync(int id);
         Task<bool> DeleteStudentAsync(List<Student> students);
